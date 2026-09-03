@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "INYATHI Fleet Management Portal"
+description = "A fleet management portal for drivers and administrators to manage reconciliations, vehicles, inspections, bookings, incidents, expenses, and related operational records."
+version = "1.0.0"
+id = "artifacts/inyathi-fleet"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23102
+
+[services.development]
+run = "pnpm --filter @workspace/inyathi-fleet run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/inyathi-fleet", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/inyathi-fleet/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23102"
+BASE_PATH = "/"

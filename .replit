@@ -1,0 +1,24 @@
+modules = ["nodejs-24"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "pnpm start"]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "pnpm build"]
+
+[workflows]
+runButton = "Dev Server"
+
+[[workflows.workflow]]
+name = "Dev Server"
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm dev"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
