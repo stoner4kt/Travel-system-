@@ -153,9 +153,15 @@ export default function DriverDashboard({ driver, onLogout }: DriverDashboardPro
     amount: '',
     expense_date: ''
   });
-  const [incidentForm, setIncidentForm] = useState({
+  const [incidentForm, setIncidentForm] = useState<{
+    vehicle_reg: string;
+    incident_type: 'accident' | 'breakdown' | 'safety_issue' | 'damage' | 'injury' | 'other';
+    description: string;
+    location: string;
+    injuries: boolean;
+  }>({
     vehicle_reg: '',
-    incident_type: 'Accident',
+    incident_type: 'accident',
     description: '',
     location: '',
     injuries: false
@@ -768,7 +774,7 @@ if (combined.length > 0 && !checklistForm.vehicle_reg) {
 
     setIncidentForm({
       vehicle_reg: vehicles[0]?.registration_no || '',
-      incident_type: 'Accident',
+      incident_type: 'accident',
       description: '',
       location: '',
       injuries: false
