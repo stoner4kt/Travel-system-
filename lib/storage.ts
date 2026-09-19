@@ -357,7 +357,7 @@ export interface IncidentReport {
   booking_id?: string;
   driver_id: string;
   vehicle_reg: string;
-  incident_type: string;
+  incident_type: 'accident' | 'breakdown' | 'safety_issue' | 'damage' | 'injury' | 'other';
   description: string;
   location: string;
   injuries: boolean;
@@ -728,6 +728,13 @@ export function transformPayloadForPush(dbTableName: string, data: any): any {
     }
   }
 
+  if (dbTableName === 'traffic_fines') {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (prepared.booking_id && !uuidRegex.test(prepared.booking_id)) {
+      prepared.booking_id = null;
+    }
+  }
+
   if (dbTableName === 'bookings') {
     const startDateStr = data.start_date ? data.start_date.split('T')[0] : '';
     const endDateStr = data.end_date ? data.end_date.split('T')[0] : '';
@@ -975,6 +982,7 @@ const TABLE_PRIMARY_KEYS: Record<string, string> = {
   delete_requests:        'id',
   rental_clients:         'id',
   rental_inspections:     'id',
+  driver_invites:         'email',
 };
 
 export async function syncAllFromSupabase() {
@@ -996,6 +1004,7 @@ export async function syncAllFromSupabase() {
       { name: 'delete_requests',   key: STORAGE_KEYS.DELETES },
       { name: 'rental_clients',    key: STORAGE_KEYS.RENTAL_CLIENTS },
       { name: 'rental_inspections', key: STORAGE_KEYS.RENTAL_INSPECTIONS },
+      { name: 'driver_invites',     key: STORAGE_KEYS.INVITES },
     ];
 
     for (const t of tables) {
@@ -1105,7 +1114,16 @@ export function initializeStorage() {
     setLocalStorageItem(STORAGE_KEYS.DIRECT_CHECKLISTS, []);
   }
   if (!window.localStorage.getItem(STORAGE_KEYS.REGION)) {
-    window.localStorage.setItem(STORAGE_KEYS.REGION, 'Cape Town');
+    try {
+      const storedUser = window.localStorage.getItem(STORAGE_KEYS.AUTH_USER);
+      const userLocation = storedUser ? (JSON.parse(storedUser) as Profile).location : null;
+      window.localStorage.setItem(
+        STORAGE_KEYS.REGION,
+        userLocation === 'Joburg' || userLocation === 'Cape Town' ? userLocation : 'Cape Town'
+      );
+    } catch {
+      window.localStorage.setItem(STORAGE_KEYS.REGION, 'Cape Town');
+    }
   }
   if (window.localStorage.getItem(STORAGE_KEYS.OTP_ENABLED) === null) {
     window.localStorage.setItem(STORAGE_KEYS.OTP_ENABLED, 'true'); // Always on in production
@@ -1175,7 +1193,7 @@ export const authApi = {
           email: email.toLowerCase(),
           role: role || 'driver',
           is_active: true,
-          location: 'Cape Town',
+          location: (data.user?.user_metadata?.location as 'Cape Town' | 'Joburg') || 'Cape Town',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -1197,6 +1215,11 @@ export const authApi = {
       
       if (!user) {
         const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        // In offline mode there is no Supabase auth response — read the active
+        // region from localStorage so a Joburg session creates a Joburg profile.
+        const offlineLocation = (
+          window.localStorage.getItem(STORAGE_KEYS.REGION) as 'Cape Town' | 'Joburg'
+        ) || 'Cape Town';
         user = {
           driver_id: role === 'admin' ? `ADM-${shortId}` : `DRV-${shortId}`,
           name: email.split('@')[0].toUpperCase(),
@@ -1204,7 +1227,7 @@ export const authApi = {
           email: email.toLowerCase(),
           role: role || 'driver',
           is_active: true,
-          location: 'Cape Town',
+          location: offlineLocation,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -1241,9 +1264,33 @@ resetPassword: async (email: string): Promise<void> => {
     await new Promise(res => setTimeout(res, 800));
   }
 },
-  signUpWithInvite: async (email: string, name: string, phone: string, password?: string): Promise<Profile> => {
+  signUpWithInvite: async (
+    email: string,
+    name: string,
+    phone: string,
+    password?: string,
+    location: 'Cape Town' | 'Joburg' = 'Cape Town'
+  ): Promise<Profile> => {
     initializeStorage();
     if (isSupabaseConfigured && supabase) {
+      // The invite is the source of truth for the driver's region. Prefer an
+      // explicitly supplied location, but fall back to the matching unused
+      // Supabase invite so Joburg invites cannot silently become Cape Town.
+      let inviteLocation: 'Cape Town' | 'Joburg' = location;
+      try {
+        const { data: inviteRow } = await supabase
+          .from('driver_invites')
+          .select('location')
+          .eq('email', email.toLowerCase())
+          .is('used_at', null)
+          .maybeSingle();
+        if (inviteRow?.location === 'Cape Town' || inviteRow?.location === 'Joburg') {
+          inviteLocation = inviteRow.location;
+        }
+      } catch (inviteLookupError) {
+        console.warn('Could not resolve driver invite location:', inviteLookupError);
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase(),
         password: password || 'Inyathi123!',
@@ -1252,6 +1299,7 @@ resetPassword: async (email: string): Promise<void> => {
             name,
             phone,
             role: 'driver',
+            location: inviteLocation,
           }
         }
       });
@@ -1267,7 +1315,7 @@ resetPassword: async (email: string): Promise<void> => {
         email: email.toLowerCase(),
         role: 'driver',
         is_active: true,
-        location: 'Cape Town',
+        location: inviteLocation,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1429,25 +1477,30 @@ export const driversApi = {
     return getLocalStorageItem<DriverInvite[]>(STORAGE_KEYS.INVITES, []);
   },
   createInvite: (invite: DriverInvite): DriverInvite => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeInvite: DriverInvite = {
+      ...invite,
+      invited_by: uuidRegex.test(invite.invited_by || '') ? invite.invited_by : ''
+    };
     const list = getLocalStorageItem<DriverInvite[]>(STORAGE_KEYS.INVITES, []);
-    const idx = list.findIndex(i => i.email.toLowerCase() === invite.email.toLowerCase());
+    const idx = list.findIndex(i => i.email.toLowerCase() === safeInvite.email.toLowerCase());
     if (idx !== -1) {
-      list[idx] = invite;
+      list[idx] = safeInvite;
     } else {
-      list.push(invite);
+      list.push(safeInvite);
     }
     setLocalStorageItem(STORAGE_KEYS.INVITES, list);
-    pushToSupabase('invites', invite, 'email', invite.email);
+    pushToSupabase('invites', safeInvite, 'email', safeInvite.email);
 
     // Call Supabase Edge Function to invite driver
     if (isSupabaseConfigured && supabase) {
        supabase.functions.invoke('driver-invite', {
          body: {
-           email: invite.email,
-           name: invite.full_name,
-           fullName: invite.full_name,
-           phone: invite.phone,
-           location: invite.location
+           email: safeInvite.email,
+           name: safeInvite.full_name,
+           fullName: safeInvite.full_name,
+           phone: safeInvite.phone,
+           location: safeInvite.location
          }
        }).catch(err => console.error("Error triggering driver-invite function:", err));
     }

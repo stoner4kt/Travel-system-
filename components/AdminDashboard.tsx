@@ -11,7 +11,7 @@ import {
   Profile, Vehicle, Booking, Inspection, ReconSheet, TransferReconSheet, RentedVehicle, BookingDeleteRequest,
   VehicleExpense, TrafficFine, IncidentReport, BookingEditLog, VehicleChecklist, VehicleDirectChecklist,
   RentalClient, RentalInspection,
-  bookingsApi, fleetApi, driversApi, inspectionsApi, reconApi, transferReconApi, supabase, expensesApi, trafficFinesApi, incidentsApi, checklistsApi, directChecklistsApi, authApi,
+  bookingsApi, fleetApi, driversApi, inspectionsApi, reconApi, transferReconApi, regionApi, supabase, expensesApi, trafficFinesApi, incidentsApi, checklistsApi, directChecklistsApi, authApi,
   rentalClientsApi, rentalInspectionsApi,
   downloadCSV, uploadToCloudinary, getSignedUrlForView, generateUUID
 } from '@/lib/storage';
@@ -57,7 +57,12 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard({ admin, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'bookings_archive' | 'fleet' | 'rented' | 'drivers' | 'recons' | 'transfers' | 'wages' | 'fines' | 'expenses' | 'incidents' | 'inspections' | 'checklists' | 'rental_clients' | 'settings'>('dashboard');
-  const [region, setRegion] = useState<'Cape Town' | 'Joburg'>('Cape Town');
+  const [region, setRegion] = useState<'Cape Town' | 'Joburg'>(() => {
+    if (typeof window !== 'undefined') {
+      return regionApi.getRegion();
+    }
+    return 'Cape Town';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [otpEnabled, setOtpEnabled] = useState(true);
 
@@ -156,7 +161,7 @@ export default function AdminDashboard({ admin, onLogout }: AdminDashboardProps)
   const [newIncidentForm, setNewIncidentForm] = useState({
     vehicle_reg: '',
     driver_id: '',
-    incident_type: 'Accident' as 'Accident' | 'Breakdown' | 'Theft' | 'Fine' | 'Other',
+    incident_type: 'accident' as 'accident' | 'breakdown' | 'safety_issue' | 'damage' | 'injury' | 'other',
     description: '',
     location: '',
     injuries: false,
@@ -370,7 +375,7 @@ const [selectedTransferReconForModal, setSelectedTransferReconForModal] = useSta
     setNewIncidentForm({
       vehicle_reg: '',
       driver_id: '',
-      incident_type: 'Accident',
+      incident_type: 'accident',
       description: '',
       location: '',
       injuries: false,
@@ -547,6 +552,7 @@ const [selectedTransferReconForModal, setSelectedTransferReconForModal] = useSta
 
   const handleRegionSwitch = (newRegion: 'Cape Town' | 'Joburg') => {
     setRegion(newRegion);
+    regionApi.setRegion(newRegion);
   };
 
   // Perform action with OTP Guard if enabled
@@ -810,7 +816,7 @@ action();
       phone: invitePhone,
       full_name: inviteName,
       location: region,
-      invited_by: admin.id || admin.driver_id,
+      invited_by: admin.id ?? '',
       invited_at: new Date().toISOString()
     });
 
@@ -5069,11 +5075,12 @@ const handleApproveRecon = (id: string, notes: string) => {
                     onChange={(e) => setNewIncidentForm(prev => ({ ...prev, incident_type: e.target.value as any }))}
                     className="w-full px-3 py-2 border border-slate-200 text-xs rounded-lg bg-white focus:outline-hidden focus:border-teal-500 font-medium font-sans"
                   >
-                    <option value="Accident">Accident / Collision</option>
-                    <option value="Breakdown">Breakdown / Tow-in</option>
-                    <option value="Theft">Theft / Break-in</option>
-                    <option value="Fine">Traffic Fine Incident</option>
-                    <option value="Other">Other Operational Incident</option>
+                    <option value="accident">Accident</option>
+                    <option value="breakdown">Breakdown</option>
+                    <option value="safety_issue">Safety Issue</option>
+                    <option value="damage">Damage</option>
+                    <option value="injury">Injury</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
 

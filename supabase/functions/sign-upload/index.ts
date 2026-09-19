@@ -16,6 +16,7 @@ const ALLOWED_FOLDERS = new Set([
   "inyathi/incident-documents",
   "inyathi/expenses",
   "inyathi/expenses/photos",
+  "inyathi/rental-agreements",
 ]);
 
 const CORS = {
