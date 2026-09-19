@@ -982,6 +982,7 @@ const TABLE_PRIMARY_KEYS: Record<string, string> = {
   delete_requests:        'id',
   rental_clients:         'id',
   rental_inspections:     'id',
+  driver_invites:         'email',
 };
 
 export async function syncAllFromSupabase() {
@@ -1003,6 +1004,7 @@ export async function syncAllFromSupabase() {
       { name: 'delete_requests',   key: STORAGE_KEYS.DELETES },
       { name: 'rental_clients',    key: STORAGE_KEYS.RENTAL_CLIENTS },
       { name: 'rental_inspections', key: STORAGE_KEYS.RENTAL_INSPECTIONS },
+      { name: 'driver_invites',     key: STORAGE_KEYS.INVITES },
     ];
 
     for (const t of tables) {
