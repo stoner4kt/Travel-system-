@@ -347,7 +347,7 @@ export interface TrafficFine {
   email_sent_at?: string;
   notification_error?: string;
   status: 'paid' | 'pending';
-  logged_by_admin_id: string;
+  logged_by_admin_id?: string;
   created_at: string;
   updated_at: string;
 }
