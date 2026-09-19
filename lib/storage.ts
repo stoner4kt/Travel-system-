@@ -334,7 +334,7 @@ export interface VehicleExpense {
 
 export interface TrafficFine {
   id: string;
-  booking_id: string;
+  booking_id: string | null;
   vehicle_reg: string;
   driver_id: string;
   fine_timestamp: string; // ISO DateTime
@@ -342,7 +342,7 @@ export interface TrafficFine {
   location: string;
   description: string;
   amount: number;
-  notification_email: string;
+  notification_email?: string;
   email_sent: boolean;
   email_sent_at?: string;
   notification_error?: string;
