@@ -237,7 +237,7 @@ export default function DriverDashboard({ driver, onLogout }: DriverDashboardPro
     const myBookings = allBookings.filter(b => b.assigned_driver_id === driver.driver_id);
     setAssignedBookings(myBookings);
 
-    const allVehs = fleetApi.getVehicles();
+    const allVehs = fleetApi.getVehicles(driver.location as 'Cape Town' | 'Joburg');
     setVehicles(allVehs);
 
     const myInspections = inspectionsApi.getInspections().filter(i => i.driver_id === driver.driver_id);
