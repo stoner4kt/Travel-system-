@@ -978,9 +978,9 @@ const handleApproveRecon = (id: string, notes: string) => {
 
     await trafficFinesApi.saveFine({
       id: fineId,
-      booking_id: fineAutofilledDriver?.bookingId || '',
+      booking_id: fineAutofilledDriver?.bookingId || null,
       vehicle_reg: fineForm.vehicle_reg,
-      driver_id: fineAutofilledDriver?.driverId || drivers[0]?.driver_id || 'UNKNOWN',
+      driver_id: fineAutofilledDriver?.driverId || drivers[0]?.driver_id || '',
       fine_timestamp: fineForm.fine_timestamp,
       fine_reference: fineForm.fine_reference,
       location: fineForm.location,
@@ -990,7 +990,7 @@ const handleApproveRecon = (id: string, notes: string) => {
       email_sent: false,
       email_sent_at: undefined,
       status: fineForm.status || 'pending',
-      logged_by_admin_id: admin.driver_id,
+      logged_by_admin_id: admin.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });
